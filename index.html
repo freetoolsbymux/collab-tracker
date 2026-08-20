@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Collab tracker</title>
+<meta name="description" content="Track brand collaborations from first conversation to money in the bank. Free, nothing uploaded.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,300;6..72,400;6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#F6F7F5;--card:#FFF;--ink:#12181A;--mut:#66716F;--line:#E2E7E5;--soft:#EFF3F1;
+        --acc:#0E5C56;--acc-soft:#E3F0EE;--acc2:#E0703A;--acc2-soft:#FCEDE4;
+        --warn:#8A5A24;--warn-soft:#FBF3E6;
+        --good:#1B6B4A;--good-soft:#E6F1EB;--bad:#A3382C;--bad-soft:#FBEDEB}
+  *{box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-size:16px;
+       font-family:'Instrument Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .tn{font-variant-numeric:tabular-nums}
+  .hide{display:none!important}
+  .wrap{max-width:980px;margin:0 auto;padding:0 16px 132px}
+  @media(min-width:820px){.wrap{padding-bottom:60px}}
+  @media(min-width:900px){
+    #moneyView{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);
+               gap:18px;align-items:start}
+    #moneyView>#summary{grid-column:1;grid-row:1/span 2}
+    #moneyView>#goalCard{grid-column:1;grid-row:3}
+    #moneyView>.seg{grid-column:2;grid-row:1}
+    #moneyView>#drill{grid-column:2;grid-row:2}
+    #moneyView>#months{grid-column:2;grid-row:3}
+    #moneyView>.card:last-child{grid-column:1/-1}
+  }
+
+  header{padding:26px 0 16px}
+  h1{margin:0;font-family:Newsreader,serif;font-size:36px;font-weight:400;letter-spacing:-.02em}
+  .sub{font-size:14px;color:var(--mut);margin-top:8px;line-height:1.55;max-width:52ch}
+  .badge{display:inline-block;font-size:12px;font-weight:600;color:var(--acc);background:var(--acc-soft);
+         border:1px solid #C9E2DE;border-radius:999px;padding:6px 13px;margin-top:12px}
+  @media(max-width:600px){h1{font-size:29px}}
+
+  /* Bottom navigation on phones, where thumbs are; pills at the top on desktop,
+     where a fixed bottom bar just wastes the viewport. */
+  nav{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;
+      background:rgba(246,247,245,.97);backdrop-filter:blur(12px);
+      border-top:1px solid var(--line);
+      padding:7px 6px calc(7px + env(safe-area-inset-bottom))}
+  nav button{flex:1;font-family:inherit;font-size:10.5px;font-weight:600;
+    padding:7px 2px;border:0;background:none;color:var(--mut);cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;gap:4px;min-height:52px}
+  nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;
+                 stroke-linecap:round;stroke-linejoin:round}
+  nav button[aria-selected="true"]{color:var(--acc)}
+  nav button .c{font-size:9.5px;background:var(--acc);color:#fff;border-radius:999px;
+                padding:1px 5px;position:absolute;transform:translate(14px,-6px)}
+  nav button{position:relative}
+  @media(min-width:820px){
+    nav{position:static;background:none;backdrop-filter:none;border-top:0;
+        padding:0;gap:8px;margin-bottom:18px}
+    nav button{flex:1;flex-direction:row;font-size:13.5px;padding:12px 14px;
+      border:1px solid var(--line);background:var(--card);border-radius:999px;min-height:46px}
+    nav button[aria-selected="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+    nav button .c{position:static;transform:none;background:rgba(0,0,0,.12);color:inherit}
+    nav button[aria-selected="true"] .c{background:rgba(255,255,255,.22)}
+  }
+
+  /* Stat cards, two up — the cramped single row was hiding the numbers. */
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px 16px}
+  .stat .k{font-size:11.5px;color:var(--mut);font-weight:500}
+  .stat .v{font-size:23px;font-weight:700;letter-spacing:-.025em;margin-top:5px}
+  .stat.dark{background:var(--ink);border-color:var(--ink)}
+  .stat.dark .k{color:#9AA8A5}
+  .stat.dark .v{color:#F4F7F6}
+  .stat .pill{display:inline-block;font-size:10.5px;font-weight:700;border-radius:999px;
+              padding:3px 8px;margin-top:7px;background:var(--good-soft);color:var(--good)}
+  .stat .pill.warn{background:var(--warn-soft);color:var(--warn)}
+
+  /* Month strip, borrowed from the reference — tap a month, see who paid. */
+  .mstrip{display:flex;gap:14px;overflow-x:auto;padding:2px 2px 4px;
+          scrollbar-width:none;-ms-overflow-style:none}
+  .mstrip::-webkit-scrollbar{display:none}
+  .mstrip button{flex:0 0 auto;font-family:inherit;border:0;background:none;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;gap:7px;padding:2px}
+  .mstrip .dot{width:34px;height:34px;border-radius:50%;border:1.5px solid var(--line);
+               background:var(--card)}
+  .mstrip button[aria-selected="true"] .dot{background:var(--acc);border-color:var(--acc)}
+  .mstrip .ml{font-size:12.5px;font-weight:600;color:var(--mut)}
+  .mstrip button[aria-selected="true"] .ml{color:var(--acc)}
+
+  .brow{display:flex;align-items:center;gap:13px;padding:13px 0;border-bottom:1px solid var(--line)}
+  .brow:last-child{border-bottom:0}
+  .brow .bi{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;
+            justify-content:center;font-size:16px;font-weight:700;flex:0 0 auto}
+  .brow .bn{font-size:15px;font-weight:600}
+  .brow .bb{height:6px;border-radius:999px;margin-top:6px;min-width:8px}
+  .brow .bv{text-align:right;white-space:nowrap}
+  .brow .bv b{font-size:15px;font-weight:700;display:block}
+  .brow .bv span{font-size:12px;color:var(--mut)}
+  nav button .c{opacity:.65;font-weight:500}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+        padding:17px;margin-bottom:12px}
+  label{display:block;font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+        color:var(--mut);margin:0 0 5px}
+  input,select,textarea{width:100%;font-family:inherit;font-size:15px;color:var(--ink);background:var(--card);
+    border:1px solid var(--line);border-radius:9px;padding:10px 11px;-webkit-appearance:none;appearance:none}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
+  input[type=date]{-webkit-appearance:none}
+  .f{margin-bottom:11px}
+  .r2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .r3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+  @media(max-width:600px){.r3{grid-template-columns:1fr 1fr}}
+  .hint{font-size:11.5px;color:var(--mut);margin-top:5px;line-height:1.5}
+  select{background-image:linear-gradient(45deg,transparent 50%,var(--mut) 50%),
+    linear-gradient(135deg,var(--mut) 50%,transparent 50%);
+    background-position:calc(100% - 15px) 52%,calc(100% - 10px) 52%;
+    background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:30px}
+
+  /* 44px minimum on anything tappable. */
+  .btn{font-family:inherit;font-size:14px;font-weight:600;padding:12px 16px;border-radius:11px;
+       border:1px solid var(--acc);background:var(--acc);color:#fff;cursor:pointer;
+       white-space:nowrap;min-height:44px}
+  .btn.g{background:transparent;color:var(--ink);border-color:var(--line)}
+  .btn.g:hover{background:var(--soft)}
+  .btn.w{width:100%}
+  .btn.s{padding:9px 13px;font-size:12.5px;min-height:38px}
+
+  .row{background:var(--card);border:1px solid var(--line);border-radius:15px;
+       padding:15px 16px;margin-bottom:10px}
+  .row .head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .row .brand{font-size:16px;font-weight:700;letter-spacing:-.01em}
+  .row .amt{font-size:16px;font-weight:700;white-space:nowrap}
+  .row .meta{font-size:12px;color:var(--mut);margin-top:3px;line-height:1.5}
+  .row .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+  .tag{font-size:11px;font-weight:600;border-radius:999px;padding:4px 10px;
+       background:var(--soft);color:var(--mut);border:1px solid var(--line)}
+  .tag.paid{background:var(--good-soft);color:var(--good);border-color:#C9E2D6}
+  .tag.due{background:var(--warn-soft);color:var(--warn);border-color:#EEDCC0}
+  .tag.late{background:var(--bad-soft);color:var(--bad);border-color:#EFCFCA}
+  .tag a{color:inherit;text-decoration:none}
+  .row .acts{display:flex;gap:7px;margin-top:11px;flex-wrap:wrap}
+
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font-family:inherit;font-size:13px;font-weight:500;border-radius:999px;
+        padding:10px 14px;background:var(--card);color:var(--mut);
+        border:1px solid var(--line);cursor:pointer;min-height:40px}
+  .chip[aria-pressed="true"]{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+  .chipGroup{margin-bottom:11px}
+  .chipGroup .gl{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+                 color:var(--mut);margin:0 0 6px}
+  .picked{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+  .picked span{font-size:11.5px;font-weight:600;background:var(--acc-soft);color:var(--acc);
+               border:1px solid #C9E2DE;border-radius:999px;padding:4px 10px}
+
+  .av{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;
+      justify-content:center;font-size:16px;font-weight:700;flex:0 0 auto}
+  .row{position:relative;overflow:hidden}
+  .row::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--line)}
+  .row[data-s="talks"]::before{background:#C9CFCD}
+  .row[data-s="confirmed"]::before{background:var(--acc2)}
+  .row[data-s="done"]::before{background:var(--acc)}
+  .row.settled::before{background:var(--good)}
+
+  .chart{display:flex;align-items:flex-end;gap:12px;height:238px;padding:4px 2px 0;
+         overflow-x:auto}
+  .chart .col{flex:0 0 56px;width:56px;display:flex;flex-direction:column;
+              align-items:center;height:100%;justify-content:flex-end}
+  .chart .stack{width:100%;flex:1;display:flex;flex-direction:column;
+                justify-content:flex-end;gap:2px}
+  /* No min-height: a floor here painted a visible sliver for months that
+     earned nothing, which is the one thing a chart must never do. */
+  .chart .seg{width:100%;border-radius:5px}
+  .chart .seg.cash{background:var(--acc)}
+  .chart .seg.aff{background:#5FA89F}
+  .chart .seg.bart{background:#D9C9BC}
+  .chart .amt{font-size:11px;font-weight:700;margin-bottom:5px;white-space:nowrap}
+  .chart .lbl{font-size:10.5px;color:var(--mut);margin-top:7px;font-weight:600;white-space:nowrap}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;font-size:11.5px;color:var(--mut)}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px}
+
+  /* Goal card, in the spirit of the reference: soft tile, plain language,
+     one number that matters. */
+  .goal{background:var(--card);border:1px solid var(--line);border-radius:16px;
+        padding:18px;margin-bottom:12px}
+  .goal .top{display:flex;align-items:center;gap:13px;margin-bottom:14px}
+  .goal .tile{width:44px;height:44px;border-radius:13px;background:var(--acc2-soft);
+              display:flex;align-items:center;justify-content:center;font-size:21px;flex:0 0 auto}
+  .goal .t1{font-size:15.5px;font-weight:700;letter-spacing:-.01em}
+  .goal .t2{font-size:12.5px;color:var(--mut);margin-top:2px;line-height:1.45}
+  .track{height:12px;background:var(--soft);border-radius:999px;overflow:hidden;position:relative}
+  .track i{display:block;height:100%;border-radius:999px;
+           background:linear-gradient(90deg,var(--acc),#2E8E7F);transition:width .4s}
+  .track.done i{background:linear-gradient(90deg,var(--good),#37A06E)}
+  .goal .nums{display:flex;justify-content:space-between;gap:12px;margin-top:9px;
+              font-size:12.5px;color:var(--mut)}
+  .goal .nums b{color:var(--ink);font-weight:700}
+
+  .empty{padding:34px 14px;text-align:center;color:var(--mut);font-size:14px;line-height:1.6}
+  .empty b{display:block;color:var(--ink);font-size:17px;font-weight:700;margin-bottom:5px}
+
+  .big{background:var(--ink);color:#F4F7F6;border-radius:18px;padding:22px;margin-bottom:12px}
+  .big .k{font-size:10px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:#8FA09D}
+  .big .v{font-family:Newsreader,serif;font-size:40px;font-weight:400;letter-spacing:-.02em;
+          margin-top:3px;line-height:1}
+  .big .n{font-size:12.5px;color:#AEBDBA;margin-top:7px;line-height:1.5}
+  .big .split{display:flex;gap:20px;margin-top:15px;padding-top:14px;
+              border-top:1px solid rgba(255,255,255,.15);flex-wrap:wrap}
+  .big .split div{flex:1;min-width:110px}
+  .big .split .sv{font-size:18px;font-weight:700}
+  .big .split .sk{font-size:10px;color:#8FA09D;text-transform:uppercase;letter-spacing:.09em;margin-top:2px}
+
+  .seg{display:flex;gap:6px;margin-bottom:12px}
+  .seg button{flex:1;font-family:inherit;font-size:12.5px;font-weight:600;padding:9px 8px;
+    border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--mut);cursor:pointer}
+  .seg button[aria-selected="true"]{border-color:var(--acc);background:var(--acc-soft);color:var(--acc)}
+
+  .mo{display:flex;align-items:center;justify-content:space-between;gap:12px;
+      padding:12px 0;border-bottom:1px solid var(--line)}
+  .mo:last-child{border-bottom:0}
+  .mo .nm{font-size:14.5px;font-weight:600}
+  .mo .ct{font-size:11.5px;color:var(--mut);margin-top:2px}
+  .mo .vv{font-size:16px;font-weight:700;white-space:nowrap}
+  .bars{height:6px;background:var(--soft);border-radius:999px;overflow:hidden;margin-top:6px}
+  .bars i{display:block;height:100%;background:var(--acc);border-radius:999px}
+
+  .fab{position:fixed;right:18px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:41;
+       width:56px;height:56px;border-radius:19px;border:0;background:var(--acc);color:#fff;
+       font-size:30px;font-weight:300;line-height:1;cursor:pointer;
+       box-shadow:0 6px 20px rgba(14,92,86,.32)}
+  @media(min-width:820px){.fab{bottom:26px}}
+  .bar{position:fixed;left:0;right:0;bottom:0;background:rgba(248,249,248,.96);
+       backdrop-filter:blur(10px);border-top:1px solid var(--line);
+       padding:11px 16px calc(11px + env(safe-area-inset-bottom));z-index:30}
+  .bar .in{max-width:960px;margin:0 auto;display:flex;gap:9px;align-items:center}
+  .bar .lab{flex:1;min-width:0}
+  .bar .lab .k{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
+  .bar .lab .v{font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  .sheet{position:fixed;inset:0;background:rgba(18,24,26,.55);z-index:60;display:none;
+         align-items:flex-end;justify-content:center}
+  .sheet.on{display:flex}
+  .sheet .in{background:#fff;width:100%;max-width:520px;border-radius:16px 16px 0 0;
+    padding:24px 20px calc(24px + env(safe-area-inset-bottom));max-height:90vh;overflow-y:auto}
+  @media(min-width:640px){.sheet{align-items:center}.sheet .in{border-radius:16px}}
+  .sheet h3{margin:0 0 8px;font-family:Newsreader,serif;font-size:22px;font-weight:400;letter-spacing:-.01em}
+  .sheet p{margin:0 0 14px;font-size:13.5px;line-height:1.6;color:var(--mut)}
+  .skip{font-family:inherit;background:none;border:0;color:var(--mut);font-size:13px;
+        cursor:pointer;padding:13px 4px 0;text-decoration:underline;text-underline-offset:2px}
+
+  .toast{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);background:var(--ink);
+    color:#fff;font-size:13px;font-weight:600;padding:10px 17px;border-radius:999px;z-index:70;
+    opacity:0;pointer-events:none;transition:opacity .2s}
+  .toast.on{opacity:1}
+
+  .foot{text-align:center;font-size:12px;color:var(--mut);line-height:1.75;padding:24px 0 14px}
+  .credit{max-width:470px;margin:0 auto;background:var(--card);border:1px solid var(--line);
+          border-radius:13px;padding:19px 20px;text-align:center}
+  .credit .w{font-size:16px;font-weight:700;letter-spacing:-.02em}
+  .credit .m{font-size:12.5px;color:var(--mut);line-height:1.6;margin:6px 0 14px}
+  .credit .l{display:flex;gap:7px;justify-content:center;flex-wrap:wrap}
+  .credit a{font-size:12.5px;font-weight:600;text-decoration:none;color:var(--acc);
+            background:var(--acc-soft);border:1px solid #C9E2DE;border-radius:999px;padding:7px 14px}
+  .credit .news{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+  .credit .news b{font-size:12.5px;font-weight:700;display:block}
+  .credit .news p{font-size:12px;color:var(--mut);margin:4px 0 11px;line-height:1.5}
+  .credit .news .fine{font-size:11px;color:var(--mut);margin-top:8px}
+</style>
+</head>
+<body>
+
+<div class="sheet" id="gate">
+  <div class="in">
+    <h3>Before you start</h3>
+    <p id="gateCopy">This is free and always will be. If it's useful, joining the newsletter
+      is the only thing I ask in return &mdash; I'll let you know when the next tool drops.</p>
+    <div class="f"><input id="gateEmail" type="email" placeholder="you@example.com"></div>
+    <button class="btn w" type="button" onclick="submitGate()" id="gateBtn">Join my newsletter</button>
+    <div style="text-align:center"><button class="skip" id="gateSkip" type="button"
+      onclick="closeGate(true)">No thanks, just let me in</button></div>
+  </div>
+</div>
+
+<div class="sheet" id="goalSheet" onclick="if(event.target===this)close_('goalSheet')">
+  <div class="in">
+    <h3>Set yourself a target</h3>
+    <p>Entirely optional. It only shows how close you are &mdash; there are no reminders
+      and nothing is sent anywhere.</p>
+    <div class="f"><label for="gMonth">Monthly target</label>
+      <input id="gMonth" inputmode="numeric" placeholder="Leave blank to skip"></div>
+    <div class="f"><label for="gYear">Yearly target</label>
+      <input id="gYear" inputmode="numeric" placeholder="Leave blank to skip"></div>
+    <div style="display:flex;gap:9px;margin-top:6px">
+      <button class="btn g" style="flex:1" type="button" onclick="close_('goalSheet')">Cancel</button>
+      <button class="btn" style="flex:1" type="button" onclick="saveGoal()">Save</button>
+    </div>
+    <div style="text-align:center"><button class="skip" type="button" onclick="clearGoal()">Remove my targets</button></div>
+  </div>
+</div>
+
+<div class="sheet" id="editSheet" onclick="if(event.target===this)close_('editSheet')">
+  <div class="in">
+    <h3 id="editTitle">Add a collab</h3>
+    <div class="r2">
+      <div class="f"><label for="eBrand">Brand</label><input id="eBrand" placeholder="e.g. Amazon"></div>
+      <div class="f"><label for="eAmount">Amount agreed</label><input id="eAmount" inputmode="numeric" placeholder="10000"></div>
+    </div>
+    <div class="r2">
+      <div class="f"><label for="eStage">Where it's at</label>
+        <select id="eStage">
+          <option value="talks">In talks</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="done">Delivered</option>
+        </select></div>
+      <div class="f hide"><label>&nbsp;</label></div>
+      <div class="f"><label for="eAcct">Which account</label><select id="eAcct"></select></div>
+      <div class="f"><label for="eDeal">Deal type</label>
+        <select id="eDeal" onchange="dealChanged()">
+          <option value="paid">Paid</option>
+          <option value="barter">Barter only</option>
+          <option value="both">Paid plus product</option>
+          <option value="affiliate">Affiliate / commission</option>
+          <option value="gifted">Gifted, no obligation</option>
+        </select></div>
+    </div>
+
+    <div class="f">
+      <label>What you're delivering</label>
+      <div id="chipPicker"></div>
+      <div class="picked" id="pickedChips"></div>
+    </div>
+
+    <div class="f" id="productWrap">
+      <label for="eProduct">Product received</label>
+      <input id="eProduct" placeholder="e.g. Skincare set, 4 items">
+      <div class="r2" style="margin-top:8px">
+        <input id="eProductVal" inputmode="numeric" placeholder="Retail value">
+        <div style="display:flex;align-items:center;font-size:11.5px;color:var(--mut);line-height:1.4">
+          Kept out of your cash earnings, counted separately
+        </div>
+      </div>
+    </div>
+    <div class="f"><label for="eLive">Date it went live <span style="text-transform:none;letter-spacing:0;font-weight:400">— this is what decides the earning month</span></label>
+      <input id="eLive" type="date"></div>
+    <div class="f"><label for="eUrl">Link to the post <span style="text-transform:none;letter-spacing:0;font-weight:400">— optional</span></label>
+      <input id="eUrl" placeholder="Paste the Instagram or YouTube link"></div>
+    <div class="f"><label for="eContract">Contract or agreement <span style="text-transform:none;letter-spacing:0;font-weight:400">— optional</span></label>
+      <input id="eContract" placeholder="Drive or Dropbox link to the signed copy">
+      <div class="hint">A link rather than a file, so nothing heavy is stored in your browser
+        and the document stays wherever you already keep it.</div></div>
+    <div class="r2">
+      <div class="f"><label for="eInvoiced">Invoice sent?</label>
+        <select id="eInvoiced"><option value="0">Not yet</option><option value="1">Yes</option></select>
+        <div class="hint">The commonest reason a payment is late.</div></div>
+      <div class="f"><label for="eTerms">Payment terms <span style="text-transform:none;letter-spacing:0;font-weight:400">— days</span></label>
+        <input id="eTerms" inputmode="numeric" placeholder="30"></div>
+    </div>
+    <div class="r2">
+      <div class="f"><label for="ePaid">Been paid?</label>
+        <select id="ePaid"><option value="0">Not yet</option><option value="1">Yes</option></select></div>
+      <div class="f"><label for="ePaidDate">Date the money landed</label>
+        <input id="ePaidDate" type="date"></div>
+    </div>
+    <div class="f"><label for="eNotes">Notes</label><input id="eNotes" placeholder="Anything worth remembering"></div>
+    <div style="display:flex;gap:9px;margin-top:6px">
+      <button class="btn g" style="flex:1" type="button" onclick="close_('editSheet')">Cancel</button>
+      <button class="btn" style="flex:1" type="button" onclick="saveEntry()">Save</button>
+    </div>
+    <div style="text-align:center"><button class="skip" id="delBtn" type="button" onclick="delEntry()">Delete this collab</button></div>
+  </div>
+</div>
+
+<div class="wrap">
+  <header>
+    <h1>Collab tracker</h1>
+    <div class="sub">From first message to money in the bank &mdash; and the gap between
+      the month you did the work and the month you got paid.</div>
+    <span class="badge">Nothing leaves your device</span>
+  </header>
+
+  <nav>
+    <button id="t-talks" onclick="show('talks')" aria-selected="false">
+      <svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/></svg>
+      <span>Talks</span><span class="c" id="c-talks"></span></button>
+    <button id="t-confirmed" onclick="show('confirmed')" aria-selected="false">
+      <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <span>Confirmed</span><span class="c" id="c-confirmed"></span></button>
+    <button id="t-done" onclick="show('done')" aria-selected="false">
+      <svg viewBox="0 0 24 24"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+      <span>Delivered</span><span class="c" id="c-done"></span></button>
+    <button id="t-affiliate" onclick="show('affiliate')" aria-selected="false">
+      <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7L12 19"/></svg>
+      <span>Affiliate</span></button>
+    <button id="t-money" onclick="show('money')" aria-selected="true">
+      <svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+      <span>Earnings</span></button>
+  </nav>
+
+  <div class="card" style="padding:13px 15px">
+    <label for="acct">Which account</label>
+    <select id="acct"></select>
+    <div class="hint">Everything below &mdash; earnings, targets, what you're owed &mdash;
+      follows this.</div>
+  </div>
+
+  <div id="listView">
+    <button class="btn w" type="button" onclick="openNew()" style="margin-bottom:12px">+ Add a collab</button>
+    <div id="rows"></div>
+  </div>
+
+  <div id="affView" class="hide">
+    <div class="card">
+      <label>Log a month of affiliate income</label>
+      <div class="r3">
+        <input id="afMonth" type="month">
+        <input id="afSource" placeholder="Amazon, LTK, brand…">
+        <select id="afAcct" class="hide"></select>
+        <input id="afAmount" inputmode="numeric" placeholder="Amount">
+      </div>
+      <button class="btn w s" type="button" onclick="addAff()" style="margin-top:9px">Add</button>
+      <div class="hint">Affiliate pays out on its own schedule, so log it against the month
+        you earned it. It appears in both earnings views under that month.</div>
+    </div>
+    <div id="affRows"></div>
+  </div>
+
+  <div id="moneyView" class="hide">
+    <div id="summary"></div>
+    <div id="goalCard"></div>
+    <div class="seg">
+      <button id="m-work" onclick="setMode('work')" aria-selected="true">By month it went live</button>
+      <button id="m-paid" onclick="setMode('paid')" aria-selected="false">By month you were paid</button>
+    </div>
+    <div class="card" id="drill"></div>
+    <div class="card" id="months"></div>
+    <div class="card"><div class="hint" id="modeNote"></div></div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <div class="f"><label for="cur">Currency</label><select id="cur"></select></div>
+    <div class="r3">
+      <button class="btn g s" type="button" onclick="exportCsv()">Export CSV</button>
+      <button class="btn g s" type="button" onclick="exportJson()">Back up</button>
+      <button class="btn g s" type="button" onclick="importJson()">Restore</button>
+    </div>
+    <div class="hint">Everything lives in this browser. Back up now and then, or clearing
+      your browser data will take it with it.</div>
+  </div>
+
+  <div class="foot">Runs entirely in your browser. Nothing is uploaded.<br>Free forever, no account.</div>
+
+  <!-- ============ EDIT YOUR DETAILS HERE ============ -->
+  <div class="credit">
+    <div class="w">Made by Mallika</div>
+    <div class="m">If this helped, please consider following.</div>
+    <div class="l">
+      <a href="https://instagram.com/mallikaux" target="_blank" rel="noopener">@mallikaux</a>
+      <a href="https://www.mallikaux.com" target="_blank" rel="noopener">Website</a>
+      <a href="mailto:work@mallikaux.com">Say hello</a>
+    </div>
+    <div class="news">
+      <b>Be the first to know when new tools drop</b>
+      <p>I build small free tools for creators and freelancers, and write up how each was made.</p>
+      <div class="f"><input id="newsEmail" type="email" placeholder="you@example.com"></div>
+      <button class="btn w" type="button" onclick="subscribe()" id="newsBtn">Join my newsletter</button>
+      <p class="fine">We respect your privacy. Unsubscribe at any time.</p>
+    </div>
+  </div>
+  <!-- ================= END EDIT ZONE ================= -->
+</div>
+
+<button class="fab" type="button" onclick="openNew()" aria-label="Add a collab">+</button>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var GATE='soft';
+var KIT_FORM_ID='9798685';
+var STORE='collabs1';
+
+var CUR=[['INR','\u20B9','en-IN'],['USD','$','en-US'],['EUR','\u20AC','de-DE'],['GBP','\u00A3','en-GB'],
+['AED','AED','en-AE'],['SGD','S$','en-SG'],['AUD','A$','en-AU'],['CAD','C$','en-CA'],
+['ZAR','R','en-ZA'],['PHP','\u20B1','en-PH'],['IDR','Rp','id-ID'],['MYR','RM','ms-MY'],
+['NGN','\u20A6','en-NG'],['KES','KSh','en-KE'],['PKR','Rs','en-PK'],['BDT','\u09F3','bn-BD'],
+['LKR','Rs','si-LK'],['NPR','Rs','ne-NP'],['BRL','R$','pt-BR'],['MXN','MX$','es-MX']];
+
+/* Grouped so the picker reads like a brief rather than a wall of options. */
+var DELIVS=[
+ ['On your page',['Collab reel','Non-collab reel','Instagram post','Carousel',
+   '1 story','2 stories','3 stories','YouTube integration','LinkedIn post']],
+ ['For the brand',['UGC video \u2014 brand posts','UGC photo set','Raw files','Event appearance']],
+ ['Rights they are buying',['Ad rights 1 month','Ad rights 3 months','Ad rights 6 months',
+   'Ad rights 12 months','Whitelisting','Category exclusivity']]
+];
+var RIGHTS_MONTHS={'Ad rights 1 month':1,'Ad rights 3 months':3,
+  'Ad rights 6 months':6,'Ad rights 12 months':12};
+
+var ACCOUNTS_DEFAULT=[
+  {id:'main',name:'@mallikas.archive',note:'Main account'},
+  {id:'design',name:'@mallikaux',note:'Design account'}
+];
+var DB={items:[],aff:[],cur:'INR',goalMonth:0,goalYear:0,accounts:null,acct:'all'},
+    VIEW='money',MODE='work',EDIT=null,PICKED=[];
+
+function $(i){return document.getElementById(i)}
+function n(v){var x=parseFloat(String(v).replace(/[^0-9.]/g,''));return isNaN(x)?0:x}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function curInfo(){var c=DB.cur||'INR';
+  for(var i=0;i<CUR.length;i++)if(CUR[i][0]===c)return CUR[i];return CUR[0]}
+function money(v){var c=curInfo();
+  try{return new Intl.NumberFormat(c[2],{style:'currency',currency:c[0],
+    maximumFractionDigits:0}).format(Math.round(n(v)))}
+  catch(e){return c[1]+' '+Math.round(n(v))}}
+var tt;function toast(m){var e=$('toast');e.textContent=m;e.classList.add('on');
+  clearTimeout(tt);tt=setTimeout(function(){e.classList.remove('on')},2300)}
+function monthKey(d){return d?String(d).slice(0,7):''}
+function shortMonth(k){
+  if(!k)return '';
+  var p=k.split('-');
+  return new Date(+p[0],+p[1]-1,1).toLocaleDateString('en-GB',{month:'short'});
+}
+function monthName(k){
+  if(!k)return 'No date yet';
+  var p=k.split('-');
+  return new Date(+p[0],+p[1]-1,1).toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+}
+function daysSince(d){if(!d)return 0;
+  return Math.floor((Date.now()-new Date(d+'T00:00:00').getTime())/864e5)}
+
+/* ---------- storage ---------- */
+function acctName(id){
+  for(var i=0;i<DB.accounts.length;i++)if(DB.accounts[i].id===id)return DB.accounts[i].name;
+  return '';
+}
+function fillAcctSelects(){
+  var opts=DB.accounts.map(function(a){
+    return '<option value="'+a.id+'">'+esc(a.name)+(a.note?' \u2014 '+esc(a.note):'')+'</option>'}).join('');
+  $('acct').innerHTML='<option value="all">Both accounts</option>'+opts;
+  $('acct').value=DB.acct;
+  $('eAcct').innerHTML=opts;
+  $('afAcct').innerHTML=opts;
+}
+/* Every figure in the tool respects the account filter, so "which account earns
+   me more" is answerable rather than guessed at. */
+function inAcct(x){return DB.acct==='all'||!x.acct||x.acct===DB.acct}
+function save(){try{localStorage.setItem(STORE,JSON.stringify(DB))}catch(e){}}
+function load(){try{var r=localStorage.getItem(STORE);if(r)DB=JSON.parse(r)}catch(e){}
+  if(!DB.items)DB.items=[];if(!DB.aff)DB.aff=[];if(!DB.cur)DB.cur='INR';
+  if(!DB.goalMonth)DB.goalMonth=0;if(!DB.goalYear)DB.goalYear=0;
+  if(!DB.accounts||!DB.accounts.length)DB.accounts=ACCOUNTS_DEFAULT.slice();
+  if(!DB.acct)DB.acct='all'}
+
+/* ---------- deliverable chips ---------- */
+function renderChips(){
+  $('chipPicker').innerHTML=DELIVS.map(function(g){
+    return '<div class="chipGroup"><div class="gl">'+g[0]+'</div><div class="chips">'+
+      g[1].map(function(d){
+        return '<button class="chip" type="button" aria-pressed="'+(PICKED.indexOf(d)>=0)+'" '+
+          'onclick="toggleChip(\''+d.replace(/'/g,"\\'")+'\')">'+esc(d)+'</button>';
+      }).join('')+'</div></div>';
+  }).join('');
+  $('pickedChips').innerHTML=PICKED.length
+    ? PICKED.map(function(d){return '<span>'+esc(d)+'</span>'}).join('')
+    : '<span style="background:none;border:0;color:var(--mut);font-weight:400;padding:0">'+
+      'Nothing selected yet</span>';
+}
+function toggleChip(d){
+  var i=PICKED.indexOf(d);
+  if(i>=0)PICKED.splice(i,1); else PICKED.push(d);
+  renderChips();
+}
+function dealChanged(){
+  var d=$('eDeal').value;
+  $('productWrap').classList.toggle('hide',d==='paid'||d==='affiliate');
+}
+/** When ad rights were sold, work out when the licence runs out. */
+function rightsExpiry(it){
+  if(!it.live||!it.delivs)return null;
+  var m=0;
+  it.delivs.forEach(function(d){if(RIGHTS_MONTHS[d]&&RIGHTS_MONTHS[d]>m)m=RIGHTS_MONTHS[d]});
+  if(!m)return null;
+  var d0=new Date(it.live+'T00:00:00');
+  d0.setMonth(d0.getMonth()+m);
+  return d0;
+}
+
+/* ---------- editing ---------- */
+function openNew(){
+  EDIT=null;
+  $('editTitle').textContent='Add a collab';
+  $('eBrand').value='';$('eAmount').value='';$('eStage').value='talks';
+  $('eDeal').value='paid';
+  $('eAcct').value=DB.acct!=='all'?DB.acct:(DB.accounts[0]&&DB.accounts[0].id);
+  $('eLive').value='';$('eUrl').value='';$('eContract').value='';
+  $('eProduct').value='';$('eProductVal').value='';
+  $('eInvoiced').value='0';$('eTerms').value='30';
+  $('ePaid').value='0';$('ePaidDate').value='';$('eNotes').value='';
+  PICKED=[];renderChips();dealChanged();
+  $('delBtn').classList.add('hide');
+  $('editSheet').classList.add('on');
+}
+function openEdit(id){
+  var it=DB.items.filter(function(x){return x.id===id})[0];
+  if(!it)return;
+  EDIT=id;
+  $('editTitle').textContent='Edit collab';
+  $('eBrand').value=it.brand||'';$('eAmount').value=it.amount||'';
+  $('eStage').value=it.stage||'talks';$('eDeal').value=it.deal||'paid';
+  $('eAcct').value=it.acct||(DB.accounts[0]&&DB.accounts[0].id);
+  $('eLive').value=it.live||'';$('eUrl').value=it.url||'';
+  $('eContract').value=it.contract||'';
+  $('eProduct').value=it.product||'';$('eProductVal').value=it.productVal||'';
+  $('eInvoiced').value=it.invoiced?'1':'0';$('eTerms').value=it.terms||30;
+  $('ePaid').value=it.paid?'1':'0';$('ePaidDate').value=it.paidDate||'';
+  $('eNotes').value=it.notes||'';
+  PICKED=(it.delivs||[]).slice();renderChips();dealChanged();
+  $('delBtn').classList.remove('hide');
+  $('editSheet').classList.add('on');
+}
+function saveEntry(){
+  var brand=$('eBrand').value.trim();
+  if(!brand){toast('Give it a brand name');return}
+  var o={id:EDIT||('c'+Date.now()+Math.floor(Math.random()*999)),
+    brand:brand,amount:n($('eAmount').value),stage:$('eStage').value,
+    deal:$('eDeal').value,acct:$('eAcct').value,delivs:PICKED.slice(),
+    product:$('eProduct').value.trim(),productVal:n($('eProductVal').value),
+    live:$('eLive').value,url:$('eUrl').value.trim(),
+    contract:$('eContract').value.trim(),
+    invoiced:$('eInvoiced').value==='1',terms:n($('eTerms').value)||30,
+    paid:$('ePaid').value==='1',
+    paidDate:$('ePaidDate').value,notes:$('eNotes').value.trim()};
+  /* Marking something paid without a date would leave it out of the paid-month
+     view entirely, so fall back to today. */
+  if(o.paid&&!o.paidDate)o.paidDate=new Date().toISOString().slice(0,10);
+  if(EDIT){DB.items=DB.items.map(function(x){return x.id===EDIT?o:x})}
+  else DB.items.push(o);
+  save();close_('editSheet');render();toast(EDIT?'Saved':'Added');
+}
+function delEntry(){
+  if(!EDIT)return;
+  DB.items=DB.items.filter(function(x){return x.id!==EDIT});
+  save();close_('editSheet');render();toast('Deleted');
+}
+function markPaid(id){
+  DB.items=DB.items.map(function(x){
+    if(x.id!==id)return x;
+    x.paid=true;
+    if(!x.paidDate)x.paidDate=new Date().toISOString().slice(0,10);
+    if(x.stage!=='done')x.stage='done';
+    return x;
+  });
+  save();render();toast('Marked as paid');
+}
+function moveStage(id,st){
+  DB.items=DB.items.map(function(x){if(x.id===id)x.stage=st;return x});
+  save();render();
+}
+
+/* ---------- who actually paid, month by month ---------- */
+var SEL_MONTH='';
+function brandRows(mk){
+  var list=[];
+  DB.items.forEach(function(it){
+    if(!it.amount||it.stage==='talks'||!inAcct(it))return;
+    var k=monthKey(MODE==='work'?it.live:it.paidDate);
+    if(k!==mk)return;
+    if(MODE==='paid'&&!it.paid)return;
+    list.push({name:it.brand,amt:it.amount,paid:it.paid});
+  });
+  DB.aff.forEach(function(a){
+    if(DB.acct!=='all'&&a.acct&&a.acct!==DB.acct)return;
+    if(a.month===mk)list.push({name:a.source||'Affiliate',amt:a.amount,paid:true,aff:true});
+  });
+  if(!list.length)return '<div class="empty" style="padding:22px 8px">'+
+    'Nothing recorded for '+monthName(mk)+'.</div>';
+  list.sort(function(a,b){return b.amt-a.amt});
+  var tot=list.reduce(function(a,x){return a+x.amt},0)||1;
+  return '<div style="margin-top:16px">'+list.map(function(x){
+    var av=avatarFor(x.name),pct=Math.round(x.amt/tot*100);
+    return '<div class="brow">'+
+      '<div class="bi" style="background:'+av.bg+';color:'+av.fg+'">'+av.ch+'</div>'+
+      '<div style="flex:1;min-width:0"><div class="bn">'+esc(x.name)+'</div>'+
+      '<div class="bb" style="width:'+Math.max(6,pct)+'%;background:'+
+        (x.aff?'#5FA89F':av.fg)+'"></div></div>'+
+      '<div class="bv"><b>'+money(x.amt)+'</b><span>'+pct+'%'+
+        (!x.paid?' \u00B7 unpaid':'')+'</span></div></div>';
+  }).join('')+'</div>';
+}
+
+/* ---------- targets ---------- */
+function openGoal(){
+  $('gMonth').value=DB.goalMonth||'';
+  $('gYear').value=DB.goalYear||'';
+  $('goalSheet').classList.add('on');
+}
+function saveGoal(){
+  DB.goalMonth=n($('gMonth').value);DB.goalYear=n($('gYear').value);
+  save();close_('goalSheet');render();toast('Target saved');
+}
+function clearGoal(){
+  DB.goalMonth=0;DB.goalYear=0;save();close_('goalSheet');render();toast('Targets removed');
+}
+function goalHtml(rows){
+  if(!DB.goalMonth&&!DB.goalYear){
+    return '<div class="goal"><div class="top">'+
+      '<div class="tile">\u25CE</div>'+
+      '<div><div class="t1">Set yourself a target</div>'+
+      '<div class="t2">Optional. Shows how close you are, nothing more.</div></div></div>'+
+      '<button class="btn g w s" type="button" onclick="openGoal()">Add a target</button></div>';
+  }
+  var now=new Date();
+  var mk=now.toISOString().slice(0,7), yk=String(now.getFullYear());
+  var thisMonth=rows.filter(function(r){return r.key===mk})
+    .reduce(function(a,r){return a+r.sum},0);
+  var thisYear=rows.filter(function(r){return r.key.slice(0,4)===yk})
+    .reduce(function(a,r){return a+r.sum},0);
+
+  function bar(label,got,target,period){
+    if(!target)return '';
+    var pct=Math.min(100,Math.round(got/target*100));
+    var left=target-got;
+    var note=left>0
+      ? money(left)+' to go'+(period==='month'?' this month':' this year')
+      : 'Target passed by '+money(-left);
+    return '<div style="margin-bottom:16px"><div class="track'+(left<=0?' done':'')+'">'+
+      '<i style="width:'+pct+'%"></i></div>'+
+      '<div class="nums"><span>'+esc(label)+' \u00B7 <b>'+pct+'%</b></span>'+
+      '<span><b>'+money(got)+'</b> of '+money(target)+'</span></div>'+
+      '<div class="t2" style="margin-top:5px">'+note+'</div></div>';
+  }
+  var body=bar('This month',thisMonth,DB.goalMonth,'month')+
+           bar('This year',thisYear,DB.goalYear,'year');
+  return '<div class="goal"><div class="top">'+
+    '<div class="tile">\u25CE</div>'+
+    '<div><div class="t1">Your target</div>'+
+    '<div class="t2">Counted the same way as the view you\u2019re in.</div></div></div>'+
+    body+
+    '<button class="btn g w s" type="button" onclick="openGoal()">Change target</button></div>';
+}
+
+/* ---------- affiliate ---------- */
+function addAff(){
+  var m=$('afMonth').value,src=$('afSource').value.trim(),amt=n($('afAmount').value);
+  if(!m||!amt){toast('Pick a month and an amount');return}
+  DB.aff.push({id:'a'+Date.now(),month:m,source:src||'Affiliate',amount:amt,
+    acct:DB.acct!=='all'?DB.acct:(DB.accounts[0]&&DB.accounts[0].id)});
+  $('afSource').value='';$('afAmount').value='';
+  save();render();toast('Added');
+}
+function delAff(id){DB.aff=DB.aff.filter(function(x){return x.id!==id});save();render()}
+function affByMonth(){
+  var m={};
+  DB.aff.forEach(function(a){
+    if(DB.acct!=='all'&&a.acct&&a.acct!==DB.acct)return;
+    m[a.month]=(m[a.month]||0)+a.amount});
+  return m;
+}
+
+/* ---------- render ---------- */
+function stageItems(st){
+  return DB.items.filter(function(x){return x.stage===st&&inAcct(x)})
+    .sort(function(a,b){return (b.live||'')<(a.live||'')?-1:1});
+}
+function dueDate(it){
+  if(!it.live)return null;
+  var d=new Date(it.live+'T00:00:00');
+  d.setDate(d.getDate()+(n(it.terms)||30));
+  return d;
+}
+/** A colour per brand, derived from the name so it is stable between sessions. */
+function avatarFor(name){
+  var t=String(name||'?').trim()||'?',h=0;
+  for(var i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))%360;
+  return {bg:'hsl('+h+',58%,93%)',fg:'hsl('+h+',54%,30%)',ch:t[0].toUpperCase()};
+}
+function rowHtml(it){
+  var tags=[];
+  var DEALS={paid:'Paid',barter:'Barter',both:'Paid + product',
+             affiliate:'Affiliate',gifted:'Gifted'};
+  if(it.acct&&DB.acct==='all')tags.push('<span class="tag">'+esc(acctName(it.acct))+'</span>');
+  if(it.deal&&it.deal!=='paid')tags.push('<span class="tag">'+DEALS[it.deal]+'</span>');
+  (it.delivs||[]).forEach(function(d){tags.push('<span class="tag">'+esc(d)+'</span>')});
+  if(it.product)tags.push('<span class="tag">'+esc(it.product)+
+    (it.productVal?' \u00B7 '+money(it.productVal):'')+'</span>');
+  if(it.url)tags.push('<span class="tag"><a href="'+esc(it.url)+'" target="_blank" rel="noopener">View post \u2197</a></span>');
+  if(it.contract)tags.push('<span class="tag"><a href="'+esc(it.contract)+'" target="_blank" rel="noopener">Contract \u2197</a></span>');
+  if(it.paid)tags.push('<span class="tag paid">Paid '+(it.paidDate?monthName(monthKey(it.paidDate)):'')+'</span>');
+  else if(it.stage==='done'&&it.amount>0){
+    if(!it.invoiced)tags.push('<span class="tag due">Invoice not sent</span>');
+    var due=dueDate(it);
+    if(due){
+      var over=Math.floor((Date.now()-due.getTime())/864e5);
+      tags.push(over>0
+        ? '<span class="tag late">'+over+' days overdue</span>'
+        : '<span class="tag due">Due '+due.toLocaleDateString('en-GB',
+            {day:'numeric',month:'short'})+'</span>');
+    }else tags.push('<span class="tag due">Payment pending</span>');
+  }
+  /* Licences expire and brands keep running content. Nobody tracks this. */
+  var exp=rightsExpiry(it);
+  if(exp){
+    var left=Math.ceil((exp.getTime()-Date.now())/864e5);
+    tags.push(left>0
+      ? '<span class="tag">Rights until '+exp.toLocaleDateString('en-GB',
+          {day:'numeric',month:'short',year:'numeric'})+'</span>'
+      : '<span class="tag late">Ad rights expired '+exp.toLocaleDateString('en-GB',
+          {day:'numeric',month:'short'})+'</span>');
+  }
+  var acts='';
+  if(it.stage==='talks')acts+='<button class="btn g s" type="button" onclick="moveStage(\''+it.id+'\',\'confirmed\')">Confirm</button>';
+  if(it.stage==='confirmed')acts+='<button class="btn g s" type="button" onclick="moveStage(\''+it.id+'\',\'done\')">Mark delivered</button>';
+  if(it.stage==='done'&&!it.paid)acts+='<button class="btn s" type="button" onclick="markPaid(\''+it.id+'\')">Money received</button>';
+  acts+='<button class="btn g s" type="button" onclick="openEdit(\''+it.id+'\')">Edit</button>';
+
+  var av=avatarFor(it.brand);
+  return '<div class="row" data-s="'+esc(it.stage)+'"'+(it.paid?' class="row settled"':'')+'>'+
+    '<div class="head">'+
+    '<div style="display:flex;gap:11px;align-items:flex-start;flex:1;min-width:0">'+
+    '<div class="av" style="background:'+av.bg+';color:'+av.fg+'">'+av.ch+'</div>'+
+    '<div style="min-width:0"><div class="brand">'+esc(it.brand)+'</div>'+
+    '<div class="meta">'+(it.live?'Live '+new Date(it.live+'T00:00:00').toLocaleDateString('en-GB',
+      {day:'numeric',month:'short',year:'numeric'}):'No live date yet')+
+      (it.notes?' \u00B7 '+esc(it.notes):'')+'</div></div></div>'+
+    '<div class="amt tn">'+money(it.amount)+'</div></div>'+
+    (tags.length?'<div class="tags">'+tags.join('')+'</div>':'')+
+    '<div class="acts">'+acts+'</div></div>';
+}
+
+function earnings(mode){
+  var map={};
+  var aff=affByMonth();
+  Object.keys(aff).forEach(function(k){
+    (map[k]=map[k]||{sum:0,n:0,unpaid:0,barter:0,aff:0});
+    map[k].sum+=aff[k];map[k].aff+=aff[k];
+  });
+  DB.items.forEach(function(it){
+    if(!inAcct(it))return;
+    /* Product is recorded but never added to cash — a month is not a good month
+       because someone sent you skincare. */
+    if(it.productVal&&it.stage!=='talks'){
+      var bk=monthKey(mode==='work'?it.live:(it.paidDate||it.live));
+      (map[bk]=map[bk]||{sum:0,n:0,unpaid:0,barter:0,aff:0});
+      map[bk].barter+=it.productVal;
+    }
+    if(!it.amount)return;
+    if(mode==='work'){
+      /* Everything confirmed or delivered counts as earned in the month it went
+         live, whether or not the money has arrived. */
+      if(it.stage==='talks')return;
+      var k=monthKey(it.live);
+      (map[k]=map[k]||{sum:0,n:0,unpaid:0,barter:0,aff:0});
+      map[k].sum+=it.amount;map[k].n++;
+      if(!it.paid)map[k].unpaid+=it.amount;
+    }else{
+      if(!it.paid)return;
+      var k2=monthKey(it.paidDate);
+      (map[k2]=map[k2]||{sum:0,n:0,unpaid:0,barter:0,aff:0});
+      map[k2].sum+=it.amount;map[k2].n++;
+    }
+  });
+  return Object.keys(map).sort().reverse().map(function(k){
+    return {key:k,name:monthName(k),sum:map[k].sum,n:map[k].n,
+            unpaid:map[k].unpaid,barter:map[k].barter,aff:map[k].aff};
+  });
+}
+
+function render(){
+  ['talks','confirmed','done'].forEach(function(st){
+    $('c-'+st).textContent=stageItems(st).length||'';
+  });
+
+  if(VIEW==='affiliate'){
+    var list=DB.aff.filter(function(a){
+      return DB.acct==='all'||!a.acct||a.acct===DB.acct})
+      .sort(function(a,b){return a.month<b.month?1:-1});
+    $('affRows').innerHTML=list.length?list.map(function(a){
+      return '<div class="row"><div class="head"><div>'+
+        '<div class="brand">'+monthName(a.month)+'</div>'+
+        '<div class="meta">'+esc(a.source)+'</div></div>'+
+        '<div class="amt tn">'+money(a.amount)+'</div></div>'+
+        '<div class="acts"><button class="btn g s" type="button" '+
+        'onclick="delAff(\''+a.id+'\')">Remove</button></div></div>';
+    }).join('') : '<div class="empty"><b>No affiliate income logged</b>'+
+      'Add what each month brought in and it joins your earnings.</div>';
+  }else if(VIEW!=='money'){
+    var list=stageItems(VIEW);
+    $('rows').innerHTML=list.length?list.map(rowHtml).join('')
+      : '<div class="empty"><b>Nothing here yet</b>'+
+        (VIEW==='talks'?'Add a brand as soon as the first message lands.'
+         :VIEW==='confirmed'?'Anything agreed but not yet posted lives here.'
+         :'Once it is live, move it here and chase the payment.')+'</div>';
+  }else{
+    var rows=earnings(MODE);
+    var owed=DB.items.filter(function(x){return !x.paid&&x.stage!=='talks'&&inAcct(x)})
+      .reduce(function(a,x){return a+n(x.amount)},0);
+    var pipeline=DB.items.filter(function(x){return x.stage==='talks'&&inAcct(x)})
+      .reduce(function(a,x){return a+n(x.amount)},0);
+    /* Saying "this year" when the data starts in August overstates a quiet
+       year and understates a busy one. Label the range that actually exists. */
+    var total=rows.reduce(function(a,r){return a+r.sum},0);
+    var barterYear=rows.reduce(function(a,r){return a+r.barter},0);
+    var keys=rows.map(function(r){return r.key}).filter(Boolean).sort();
+    var range='Nothing logged yet';
+    if(keys.length){
+      var a0=keys[0],b0=keys[keys.length-1];
+      range=a0===b0?monthName(a0)
+        :(shortMonth(a0)+' \u2013 '+shortMonth(b0)+
+          (a0.slice(0,4)===b0.slice(0,4)?' '+b0.slice(0,4):''));
+    }
+
+    var lateCount=DB.items.filter(function(x){
+      if(!inAcct(x))return false;
+      if(x.paid||x.stage!=='done'||!x.amount)return false;
+      var d=dueDate(x);return d&&d.getTime()<Date.now();}).length;
+
+    $('summary').innerHTML=
+      '<div class="stats">'+
+      '<div class="stat dark" style="grid-column:1/-1">'+
+        '<div class="k">'+(MODE==='work'?'Earned':'Received')+' \u00B7 '+range+'</div>'+
+        '<div class="v tn">'+money(total)+'</div>'+
+        '<div class="k" style="margin-top:7px;line-height:1.45">'+(MODE==='work'
+          ? 'Counted in the month the work went live, paid or not.'
+          : 'Counted in the month the money actually arrived.')+'</div></div>'+
+      '<div class="stat"><div class="k">Still owed</div>'+
+        '<div class="v tn">'+money(owed)+'</div>'+
+        (lateCount?'<span class="pill warn">'+lateCount+' overdue</span>':'')+'</div>'+
+      '<div class="stat"><div class="k">In talks</div>'+
+        '<div class="v tn">'+money(pipeline)+'</div></div>'+
+      '<div class="stat"><div class="k">Product received</div>'+
+        '<div class="v tn">'+money(barterYear)+'</div>'+
+        '<div class="k" style="margin-top:5px">Never counted as cash</div></div>'+
+      '<div class="stat"><div class="k">Collabs logged</div>'+
+        '<div class="v tn">'+DB.items.filter(inAcct).length+'</div></div>'+
+      '</div>';
+
+    /* Cash only. Stacking product here meant a month with no money still drew a
+       bar, which is the sort of chart that flatters you into a bad decision.
+       Product is reported below, where it can be named. */
+    var chron=rows.slice().reverse();
+    var max=chron.reduce(function(a,r){return Math.max(a,r.sum)},0)||1;
+    $('months').innerHTML=rows.length
+      ? '<div class="chart">'+chron.map(function(r){
+          var cash=r.sum-r.aff, H=150;
+          function h(v){return v>0?Math.max(4,Math.round(v/max*H)):0}
+          return '<div class="col"><div class="stack">'+
+            '<div class="amt tn">'+money(r.sum)+'</div>'+
+            (r.aff>0?'<div class="seg aff" style="height:'+h(r.aff)+'px" title="Affiliate"></div>':'')+
+            (cash>0?'<div class="seg cash" style="height:'+h(cash)+'px" title="Collabs"></div>':'')+
+            '</div><div class="lbl">'+shortMonth(r.key)+'</div></div>';
+        }).join('')+'</div>'+
+        '<div class="legend"><span><i style="background:var(--acc)"></i>Collabs</span>'+
+        '<span><i style="background:#5FA89F"></i>Affiliate</span>'+
+        '<span style="opacity:.8">Product received is listed below, never counted as cash</span></div>'+
+        '<div style="margin-top:16px">'+rows.map(function(r){
+          return '<div class="mo"><div style="flex:1"><div class="nm">'+r.name+'</div>'+
+            '<div class="ct">'+(r.n?r.n+' collab'+(r.n>1?'s':''):'no collabs')+
+            (r.aff>0?' \u00B7 '+money(r.aff)+' affiliate':'')+
+            (r.barter>0?' \u00B7 '+money(r.barter)+' in product':'')+
+            (MODE==='work'&&r.unpaid>0?' \u00B7 '+money(r.unpaid)+' still unpaid':'')+
+            '</div></div><div class="vv tn">'+money(r.sum)+'</div></div>';
+        }).join('')+'</div>'
+      : '<div class="empty"><b>No earnings yet</b>Add a collab and it appears here.</div>';
+
+    $('goalCard').innerHTML=goalHtml(rows);
+
+    /* Wise-style drill-down: pick a month, see which brands made it up. */
+    var keysAsc=rows.map(function(r){return r.key}).filter(Boolean).sort();
+    if(keysAsc.length){
+      if(!SEL_MONTH||keysAsc.indexOf(SEL_MONTH)<0)SEL_MONTH=keysAsc[keysAsc.length-1];
+      $('drill').innerHTML=
+        '<div class="mstrip">'+keysAsc.map(function(k){
+          return '<button type="button" aria-selected="'+(k===SEL_MONTH)+'" '+
+            'onclick="SEL_MONTH=\''+k+'\';render()"><span class="dot"></span>'+
+            '<span class="ml">'+shortMonth(k)+'</span></button>';
+        }).join('')+'</div>'+
+        brandRows(SEL_MONTH);
+    }else $('drill').innerHTML='';
+
+    $('modeNote').innerHTML=MODE==='work'
+      ? '<b>By month it went live.</b> A collab posted in August counts as August, even if '+
+        'the money lands in September. This is the honest picture of how a month went.'
+      : '<b>By month you were paid.</b> The same collab counts as September, because that '+
+        'is when the money was actually available to you. Use this for cashflow.';
+  }
+
+  save();
+}
+function show(v){
+  VIEW=v;
+  ['talks','confirmed','done','affiliate','money'].forEach(function(x){
+    $('t-'+x).setAttribute('aria-selected',x===v)});
+  $('listView').classList.toggle('hide',v==='money'||v==='affiliate');
+  $('affView').classList.toggle('hide',v!=='affiliate');
+  $('moneyView').classList.toggle('hide',v!=='money');
+  render();
+}
+function setMode(m){
+  MODE=m;
+  $('m-work').setAttribute('aria-selected',m==='work');
+  $('m-paid').setAttribute('aria-selected',m==='paid');
+  render();
+}
+
+/* ---------- data out ---------- */
+function exportCsv(){
+  var head=['Brand','Amount','Deal','Stage','Deliverables','Product','Product value',
+            'Live date','Post link','Contract link','Invoiced','Terms (days)',
+            'Paid','Paid date','Account','Notes'];
+  var q=function(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'};
+  var rows=DB.items.map(function(i){
+    return [i.brand,i.amount,i.deal||'paid',i.stage,(i.delivs||[]).join('; '),
+            i.product,i.productVal,i.live,i.url,i.contract,
+            i.invoiced?'Yes':'No',i.terms||30,
+            i.paid?'Yes':'No',i.paidDate,acctName(i.acct),i.notes].map(q).join(',')});
+  dl(new Blob([head.map(q).join(',')+'\n'+rows.join('\n')],{type:'text/csv'}),'collabs.csv');
+}
+function exportJson(){
+  dl(new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}),
+     'collab-backup-'+new Date().toISOString().slice(0,10)+'.json');
+}
+function importJson(){
+  var i=document.createElement('input');i.type='file';i.accept='application/json';
+  i.onchange=function(e){
+    var f=e.target.files[0];if(!f)return;
+    var fr=new FileReader();
+    fr.onload=function(){
+      try{var o=JSON.parse(fr.result);
+        if(!o.items)throw 0;
+        DB=o;save();render();toast('Restored');
+      }catch(err){toast('That file didn\u2019t look right')}
+    };
+    fr.readAsText(f);
+  };
+  i.click();
+}
+function dl(blob,name){
+  var u=URL.createObjectURL(blob),a=document.createElement('a');
+  a.download=name;a.href=u;a.click();
+  setTimeout(function(){URL.revokeObjectURL(u)},4000);
+}
+
+/* ---------- newsletter ---------- */
+function postEmail(email,done){
+  if(!KIT_FORM_ID){done(false,'Signup isn\u2019t set up yet');return}
+  var body=new URLSearchParams();body.append('email_address',email);
+  fetch('https://app.kit.com/forms/'+encodeURIComponent(KIT_FORM_ID)+'/subscriptions',
+    {method:'POST',headers:{'Accept':'application/json'},body:body})
+  .then(function(r){r.ok?done(true):done(false,'Kit returned '+r.status)})
+  ['catch'](function(){done(true)});
+}
+function submitGate(){
+  var e=$('gateEmail').value.trim();
+  if(!/^\S+@\S+\.\S+$/.test(e)){toast('That email doesn\u2019t look right');return}
+  var b=$('gateBtn');b.disabled=true;b.textContent='One moment\u2026';
+  postEmail(e,function(ok,msg){
+    if(ok){closeGate(false);toast('Thank you \u2014 check your inbox to confirm')}
+    else{b.disabled=false;b.textContent='Join my newsletter';toast(msg||'That didn\u2019t go through')}
+  });
+}
+function closeGate(sk){$('gate').classList.remove('on');
+  try{localStorage.setItem('collabGate',sk?'skipped':'done')}catch(e){}}
+function subscribe(){
+  var e=$('newsEmail').value.trim();
+  if(!/^\S+@\S+\.\S+$/.test(e)){toast('That email doesn\u2019t look right');return}
+  var b=$('newsBtn');b.disabled=true;b.textContent='Subscribing\u2026';
+  postEmail(e,function(ok,msg){
+    b.textContent=ok?'Check your inbox':'Join my newsletter';
+    if(!ok)b.disabled=false;
+    toast(ok?'Almost there \u2014 confirm from the email Kit just sent':(msg||'Couldn\u2019t send'));
+  });
+}
+function close_(id){$(id).classList.remove('on')}
+
+/* ---------- boot ---------- */
+(function(){
+  load();
+  $('cur').innerHTML=CUR.map(function(c){
+    return '<option value="'+c[0]+'"'+(c[0]===DB.cur?' selected':'')+'>'+c[0]+' \u2014 '+c[1]+'</option>'}).join('');
+  $('cur').addEventListener('change',function(){DB.cur=$('cur').value;save();render()});
+  var seen='';try{seen=localStorage.getItem('collabGate')||''}catch(e){}
+  if(GATE!=='off'&&!seen){
+    if(GATE==='hard'){$('gateSkip').classList.add('hide');
+      $('gateCopy').textContent='This tool is completely free. Join the newsletter and it\u2019s yours.'}
+    $('gate').classList.add('on');
+  }
+  fillAcctSelects();
+  $('acct').addEventListener('change',function(){DB.acct=$('acct').value;save();render()});
+  renderChips();dealChanged();
+  $('afMonth').value=new Date().toISOString().slice(0,7);
+  show('money');
+})();
+</script>
+</body>
+</html>
